@@ -1,0 +1,52 @@
+
+
+param(
+    [Alias('H')]
+	[String]$Hostname = "localhost",
+	[Alias('w')]
+	[float]$Warning = 80,
+	[Alias('c')]
+	[float]$Critical = 90,
+	[Alias('d')]
+	[Switch]$Debug = $FALSE
+)
+
+if ($Debug) {
+	Set-PSDebug -Trace 2
+}
+
+
+function mem {
+
+$memfree=Get-WmiObject Win32_OperatingSystem -ComputerName $Hostname | fl *freePhysical* | Out-String
+$memtotal=Get-WmiObject Win32_OperatingSystem -ComputerName $Hostname | fl *totalvisiblememory* | Out-String
+
+$memfree = $memfree -replace '\D+(\d+)','$1'
+$memtotal = $memtotal  -replace '\D+(\d+)','$1'
+$memused = $memtotal-$memfree
+
+$memused = [math]::Round(($memused/1024)/1024)
+
+$memout = [math]::Round($memfree/$memtotal*10000)/100
+
+
+[String]$Severity = 'OK';
+[int]$ExitCode = 0;
+
+if ($Critical -ne 0 -And $memout -ge $Critical) {
+	$Severity = 'CRITICAL';
+	$ExitCode = 2;
+} elseif ($Warning -ne 0 -And $memout -ge $Warning) {
+	$Severity = 'WARNING';
+	$ExitCode = 1;
+}
+
+	Write-Host ([String]::Format('MEM {0} {1}% | Memory Used = {2}GB',
+		$Severity,
+		$memout,
+		$memused,
+		$Critical
+	));
+}
+
+exit mem $Hostname -Warning $Warning -Critical $Critical;
